@@ -6,7 +6,6 @@
         h1, h2, h3, h4 {margin:10px 0;}
         code {font-family: courier;}
         hr {height: 0px; padding: 0; margin: 20px 0; border: none; border-bottom: 1px solid #DDD;}
-        .grid label {display:block;}
     </style>
     <title>AT&amp;T Enhanced WebRTC Test App</title>
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -16,35 +15,18 @@
     <div style="width:800px;float:left;">
 
         <h2>AT&amp;T Enhanced WebRTC Test App</h2>
-        <p><b>IMPORTANT:</b> Must use Chrome with security disabled: <code>chrome.exe --user-data-dir="C:/Chrome dev session" --disable-web-security</code></p>
-        <div class="grid">
-            <div style="width:50%;float:left;">    
-                <h3>Environment</h3>
-                <label>
-                    <select id="environment" size="7">
-                        <option value="PROD" selected="true">Prod (Global) - api.att.com</option>
-                    </select>
-                </label>    
-            </div>
-            <div style="width:50%;float:left;">    
-                <h3>Application</h3>
-                <label>App
-                    <select id="app">
-                        <option value="custom">Custom ...</option>
-                    </select>
-                </label>        
-                <label>App Key <input type="text" id="appKey"></label> 
-                <label>App Secret <input type="text" id="appSecret"></label> 
-                <label>E911 ID <input type="text" id="e911Id"></label>
-            </div>
-            <div style="clear:both;"></div>            
+        <p style="font-size:14px;background:#eeeeee;border:1px dashed #ccc;padding:5px;"><b>IMPORTANT:</b> Must use Chrome with security disabled: <br><code>chrome.exe --user-data-dir="C:/Chrome dev session" --disable-web-security</code></p>
+        <div>
+            <h2>Application Details</h2>
+            <label>App Key <input type="text" id="appKey"></label> 
+            <label>App Secret <input type="text" id="appSecret"></label> 
         </div>
 
         <hr>
 
         <div>
             <div>
-                <h2>OAuth
+                <h2>Access Token
                     <select id="oauth">
                         <option value="">Original</option>
                         <option value="/v4">v4</option>
@@ -78,7 +60,8 @@
         <label>Token <input type="text" id="token" value=""></label>
         <label><input type="checkbox" id="e911" checked="true"> E911</label>
         <button type="button" id="login">Log In</button>
-        <button type="button" id="logout">Log Out</button>
+        <button type="button" id="logout" style="margin-right:15px;">Log Out</button>
+        <label>E911 ID <input type="text" id="e911Id" value="a090:5e5c:34a6:9807"></label>
 
         <hr>
 
@@ -126,8 +109,7 @@
     <script src="ewebrtc-sdk.min.js"></script>
     <script src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
     <script>
-        var configure,
-            phone;
+        var phone;
         $(function(){
 
             var sessionId,
@@ -140,8 +122,7 @@
                 apps = {
                     'custom': {
                         client_id: '',
-                        client_secret: '',
-                        vtns: []
+                        client_secret: ''
                     }
                 },
                 events = [
@@ -192,68 +173,22 @@
                 $console.scrollTop($console.get(0).scrollHeight);
             };
 
+            // Set log level to 'debug'
             ATT.logManager.setGlobalLogLevel('debug');
 
             // Initialize app if browser is WebRTC enabled 
             if (ATT.browser.hasWebRTC() !== 'Not Supported'){
 
+                logger('log', 'Enter custom app details.', apps[app]);
+
                 var consentify = function(){
                     $('#consent').html('<a target="_blank" href="https://' + environs[environ] + '/oauth' + oauth + '/authorize?client_id=' + $('#appKey').val() + '&scope=WEBRTCMOBILE">Get Consent &raquo;</href>');
                 };
 
-                configure = function(){
-                    ATT.rtc.configure({
-                        api_endpoint: 'https://' + environs[environ]
-                    });
-                    consentify();
-                };
-
-                var selectE911Id = function(environ){
-                    var which = 'PROD';
-                    if (environ.indexOf('UAT') >= 0){
-                        which = environ;
-                    }
-                    return {
-                        PROD: 'a090:5e5c:34a6:9807', 
-                    }[which];
-                };
-
-                // Select environment
-                var selectEnviron = function(){
-                    environ = $('#environment').val();
-                    $('#e911Id').val(selectE911Id(environ));
-                    configure();
-                    logger('log', 'WebRTC configured for ' + environ + '!', environ + ': ' + environs[environ]);
-                };
-
-                $('#environment').on('change', selectEnviron);
-
-                selectEnviron();
-
-                // Select app
-                var selectApp = function(){
-                    app = $('#app').val();
-                    $('#appKey').val(apps[app].client_id);
-                    $('#appSecret').val(apps[app].client_secret);
-                    configure();
-                    if (app === 'custom'){
-                        logger('log', 'Enter custom app details.', apps[app]);
-                    } else {
-                        logger('log', 'App ' + app + ' is ready for use!', apps[app]);
-                    }
-                };
-
-                $('#app').on('change', selectApp);
-
-                selectApp();
-
                 // Handle custom app details
                 var customizeApp = function(){
-                    app = 'custom';
-                    apps[app].client_id = $('#appKey').val();
-                    apps[app].client_secret = $('#appSecret').val();
-                    configure();
                     if ($('#appKey').val() && $('#appSecret').val()){
+                        consentify();
                         logger('log', 'App ' + app + ' is ready for use!', apps[app]);
                     }
                 };
@@ -265,7 +200,7 @@
                     consentify();
                 });
 
-                // Instantiate the phone
+                // Get reference to the phone object
                 phone = ATT.rtc.Phone.getPhone();
 
                 // UI event handlers
@@ -343,7 +278,7 @@
 
                 // OAuth ICMN
                 $('#tokenICMN').on('click', function(){
-                    $.ajax('https://' + environs[environ]     + '/oauth' + oauth + '/token', {
+                    $.ajax('https://' + environs[environ] + '/oauth' + oauth + '/token', {
                         type: 'POST',
                         data: {
                             client_id: $('#appKey').val(),
@@ -362,7 +297,7 @@
 
                 // OAuth VTN/No-TN
                 $('#tokenUserId').on('click', function(){
-                    $.ajax('https://' + environs[environ]     + '/oauth' + oauth + '/token', {
+                    $.ajax('https://' + environs[environ] + '/oauth' + oauth + '/token', {
                         type: 'POST',
                         data: {
                             client_id: $('#appKey').val(),
@@ -435,7 +370,7 @@
 
                 window.onunload = function(){
                     if (sessionId){
-                        $.ajax('https://' + environs[environ]     + '/RTC/v1/sessions/' + sessionId, {
+                        $.ajax('https://' + environs[environ] + '/RTC/v1/sessions/' + sessionId, {
                             type: 'DELETE',
                             headers: {
                                 'Authorization': 'Bearer ' + $('#token').val()
