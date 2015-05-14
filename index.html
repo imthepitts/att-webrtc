@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        * {font-family: arial;}
+        h1, h2, h3, h4 {margin:10px 0;}
+        code {font-family: courier;}
+        hr {height: 0px; padding: 0; margin: 20px 0; border: none; border-bottom: 1px solid #DDD;}
+        .grid label {display:block;}
+    </style>
+    <title>AT&amp;T Enhanced WebRTC Test App</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+</head>
+
+<body style="width:1220px;margin:auto;">
+    <div style="width:800px;float:left;">
+
+        <h2>AT&amp;T Enhanced WebRTC Test App</h2>
+        <p><b>IMPORTANT:</b> Must use Chrome with security disabled: <code>chrome.exe --user-data-dir="C:/Chrome dev session" --disable-web-security</code></p>
+        <div class="grid">
+            <div style="width:50%;float:left;">    
+                <h3>Environment</h3>
+                <label>
+                    <select id="environment" size="7">
+                        <option value="PROD" selected="true">Prod (Global) - api.att.com</option>
+                    </select>
+                </label>    
+            </div>
+            <div style="width:50%;float:left;">    
+                <h3>Application</h3>
+                <label>App
+                    <select id="app">
+                        <option value="custom">Custom ...</option>
+                    </select>
+                </label>        
+                <label>App Key <input type="text" id="appKey"></label> 
+                <label>App Secret <input type="text" id="appSecret"></label> 
+                <label>E911 ID <input type="text" id="e911Id"></label>
+            </div>
+            <div style="clear:both;"></div>            
+        </div>
+
+        <hr>
+
+        <div>
+            <div>
+                <h2>OAuth
+                    <select id="oauth">
+                        <option value="">Original</option>
+                        <option value="/v4">v4</option>
+                    </select>
+                </h2> 
+            </div>
+        </div>
+        <div>
+            <div style="width:50%;float:left;">
+                <h3>ICMN Token</h3>
+                <p><strong>Consent:</strong>
+                    <span id="consent"></span>
+                </p>
+                <label>Auth Code <input type="text" id="code"></label>
+                <button type="button" id="tokenICMN">Get ICMN Token</button>
+
+            </div>
+            <div style="width:50%;float:left;">
+
+                <h3>VTN/No-TN Token</h3>
+                <p>Enter User ID (<code>UserName</code>) or VTN (<code>vtn:4258675309</code>).</p>
+                <label>User ID/VTN<input type="text" id="userId"></label> <button type="button" id="tokenUserId">Get User Token</button>
+
+            </div>
+            <div style="clear:both;"></div>
+        </div>
+
+        <hr>
+
+        <h2>Session</h2>
+        <label>Token <input type="text" id="token" value=""></label>
+        <label><input type="checkbox" id="e911" checked="true"> E911</label>
+        <button type="button" id="login">Log In</button>
+        <button type="button" id="logout">Log Out</button>
+
+        <hr>
+
+        <h2>Call</h2>
+
+        <div style="width:50%;float:left;">
+            <h3>Outgoing</h3>
+            <input type="text" id="to" value="" placeholder="14258675309 or user@domain.com">
+            <button id="clean" title="Clean Phone Number">#</button>
+            <button id="video">Video</button><button id="audio">Audio</button><button id="cancel">Cancel</button>
+
+            <h3>Incoming</h3>
+            <input type="text" id="from">
+            <button type="button" id="answer">Answer</button><button type="button" id="reject">Reject</button>
+        </div>
+        <div style="width:50%;float:left;">
+            <h3>Manage</h3>
+            <button type="button" id="move">Move</button>
+            <button type="button" class="hangup">Hang Up</button>
+
+            <h3>Media</h3>
+            <button type="button" id="mute">Mute</button><button type="button" id="unmute">Unmute</button> &nbsp;&nbsp;&nbsp;
+            <button type="button" id="hold">Hold</button><button type="button" id="resume">Resume</button>
+        </div>
+        <div style="clear:both;"></div>
+        <hr>
+
+        <h2>Video</h2>
+        <div style="position:relative;">
+            <video id="them" style="width:100%;"></video>
+            <video id="me" style="position:absolute;bottom:4px;right:0;width:25%;"></video>
+        </div>
+        <div style="position:relative;">
+            <video id="them2" style="width:100%;"></video>
+            <video id="me2" style="position:absolute;bottom:4px;right:0;width:25%;"></video>
+        </div>
+
+    </div>
+
+    <div style="float:right;">
+        <h2>Console</h2>
+        <textarea id="console" style="width:400px;height:800px;"></textarea>
+    </div>
+
+    <script src="ewebrtc-sdk.min.js"></script>
+    <script src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+    <script>
+        var configure,
+            phone;
+        $(function(){
+
+            var sessionId,
+                oauth = '',
+                environ = 'PROD',
+                environs = {
+                    PROD: 'api.att.com',
+                },
+                app = 'custom',
+                apps = {
+                    'custom': {
+                        client_id: '',
+                        client_secret: '',
+                        vtns: []
+                    }
+                },
+                events = [
+                    'call:canceled',
+                    'call:connected',
+                    'call:connecting',
+                    'call:disconnected',
+                    'call:disconnecting',
+                    'call:held',
+                    'call:incoming',
+                    'call:muted',
+                    'call:rejected',
+                    'call:resumed',
+                    'call:ringback-provided',
+                    'call:unmuted',
+                    'conference:connected',
+                    'conference:connecting',
+                    'conference:disconnecting',
+                    'conference:ended',
+                    'conference:held',
+                    'conference:invitation-accepted',
+                    'conference:invitation-received',
+                    'conference:invitation-rejected',
+                    'conference:invitation-sending',
+                    'conference:invitation-sent',
+                    'conference:joining',
+                    'conference:participant-removed',
+                    'conference:resumed',
+                    'address-updated',
+                    'answering',
+                    'dialing',
+                    'media:established',
+                    'notification',
+                    'session:call-switched',
+                    'session:disconnected',
+                    'session:expired',
+                    'session:ready',
+                    'session:call-switched'
+                ]
+            ;
+
+            // Log events to the console
+            var logger = function(type, eventName, data){
+                var $console = $('#console');
+                console[type](eventName.toUpperCase() + ' - ' + new Date());
+                console[type](data);
+                $console.append(eventName.toUpperCase() + ' - ' + new Date() + '\n' + JSON.stringify(data) + '\n\n');
+                $console.scrollTop($console.get(0).scrollHeight);
+            };
+
+            ATT.logManager.setGlobalLogLevel('debug');
+
+            // Initialize app if browser is WebRTC enabled 
+            if (ATT.browser.hasWebRTC() !== 'Not Supported'){
+
+                var consentify = function(){
+                    $('#consent').html('<a target="_blank" href="https://' + environs[environ] + '/oauth' + oauth + '/authorize?client_id=' + $('#appKey').val() + '&scope=WEBRTCMOBILE">Get Consent &raquo;</href>');
+                };
+
+                configure = function(){
+                    ATT.rtc.configure({
+                        api_endpoint: 'https://' + environs[environ]
+                    });
+                    consentify();
+                };
+
+                var selectE911Id = function(environ){
+                    var which = 'PROD';
+                    if (environ.indexOf('UAT') >= 0){
+                        which = environ;
+                    }
+                    return {
+                        PROD: 'a090:5e5c:34a6:9807', 
+                    }[which];
+                };
+
+                // Select environment
+                var selectEnviron = function(){
+                    environ = $('#environment').val();
+                    $('#e911Id').val(selectE911Id(environ));
+                    configure();
+                    logger('log', 'WebRTC configured for ' + environ + '!', environ + ': ' + environs[environ]);
+                };
+
+                $('#environment').on('change', selectEnviron);
+
+                selectEnviron();
+
+                // Select app
+                var selectApp = function(){
+                    app = $('#app').val();
+                    $('#appKey').val(apps[app].client_id);
+                    $('#appSecret').val(apps[app].client_secret);
+                    configure();
+                    if (app === 'custom'){
+                        logger('log', 'Enter custom app details.', apps[app]);
+                    } else {
+                        logger('log', 'App ' + app + ' is ready for use!', apps[app]);
+                    }
+                };
+
+                $('#app').on('change', selectApp);
+
+                selectApp();
+
+                // Handle custom app details
+                var customizeApp = function(){
+                    app = 'custom';
+                    apps[app].client_id = $('#appKey').val();
+                    apps[app].client_secret = $('#appSecret').val();
+                    configure();
+                    if ($('#appKey').val() && $('#appSecret').val()){
+                        logger('log', 'App ' + app + ' is ready for use!', apps[app]);
+                    }
+                };
+
+                $('#appKey, #appSecret').on('change', customizeApp);
+
+                $('#oauth').on('change', function(){
+                    oauth = $(this).val();
+                    consentify();
+                });
+
+                // Instantiate the phone
+                phone = ATT.rtc.Phone.getPhone();
+
+                // UI event handlers
+                $('#login').on('click', function(){
+                    phone.login({
+                        token: $('#token').val(),
+                        e911Id: $('#e911').prop('checked') ? $('#e911Id').val() : null
+                    });
+                });
+
+                $('#logout').on('click', function(){
+                    phone.logout();
+                });
+
+                $('#clean').on('click', function(){
+                    $('#to').val(phone.cleanPhoneNumber($('#to').val()));
+                });
+
+                $('#video').on('click', function(){                    
+                    phone.dial({
+                        destination: $('#to').val(),
+                        mediaType: 'video',
+                        localMedia: $('#me').get(0),
+                        remoteMedia: $('#them').get(0)
+                    });
+                });
+
+                $('#audio').on('click', function(){                    
+                    phone.dial({
+                        destination: $('#to').val(),
+                        mediaType: 'audio',
+                        localMedia: $('#me').get(0),
+                        remoteMedia: $('#them').get(0)
+                    });
+                });
+
+                $('#cancel').on('click', function(){
+                    phone.cancel();
+                });
+
+                $('#answer').on('click', function(){
+                    phone.answer({
+                        localMedia: $('#me').get(0),
+                        remoteMedia: $('#them').get(0)
+                    });
+                });
+
+                $('#reject').on('click', function(){
+                    phone.reject();
+                });
+
+                $('#mute').on('click', function(){
+                    phone.mute();
+                });
+
+                $('#unmute').on('click', function(){
+                    phone.unmute();
+                });
+
+                $('#hold').on('click', function(){
+                    phone.hold();
+                });
+
+                $('#resume').on('click', function(){
+                    phone.resume();
+                });
+
+                $('.hangup').on('click', function(){
+                    phone.hangup();
+                });
+
+                $('#move').on('click', function(){
+                    phone.move();
+                });
+
+                // OAuth ICMN
+                $('#tokenICMN').on('click', function(){
+                    $.ajax('https://' + environs[environ]     + '/oauth' + oauth + '/token', {
+                        type: 'POST',
+                        data: {
+                            client_id: $('#appKey').val(),
+                            client_secret: $('#appSecret').val(),
+                            grant_type: 'authorization_code',
+                            code: $('#code').val()
+                        }
+                    }).done(function(data){
+                        $('#e911').prop('checked', true);
+                        $('#token').val(data.access_token);
+                        logger('log', 'ICMN Access Token Ready', data);
+                    }).fail(function(jqXHR, textStatus, errorThrown ){
+                        logger('error', 'jQuery Ajax Error', textStatus + ': ' + errorThrown);
+                    });
+                });
+
+                // OAuth VTN/No-TN
+                $('#tokenUserId').on('click', function(){
+                    $.ajax('https://' + environs[environ]     + '/oauth' + oauth + '/token', {
+                        type: 'POST',
+                        data: {
+                            client_id: $('#appKey').val(),
+                            client_secret: $('#appSecret').val(),
+                            grant_type: 'client_credentials',
+                            scope: 'WEBRTC'
+                        }
+                    }).done(function(data){
+                        $('#token').val(data.access_token);
+                        logger('log', 'VTN/No-TN Access Token Ready', data);
+
+                        // Associate token to UserID/VTN
+                        $.ajax('https://' + environs[environ]     + '/RTC/v1/userIds/' + $('#userId').val(), {
+                            type: 'PUT',
+                            headers: {
+                                'Authorization': 'Bearer ' + $('#token').val()
+                            }
+                        }).done(function(data){
+                            if ($('#userId').val().toLowerCase().indexOf('vtn:') === 0){
+                                $('#e911').prop('checked', true);
+                            } else {
+                                $('#e911').prop('checked', false);
+                            }
+                            logger('log', 'User ID ' + $('#userId').val() + ' associated to token', data);
+                            
+                        }).fail(function(jqXHR, textStatus, errorThrown ){
+                            logger('error', 'jQuery Ajax Error', textStatus + ': ' + errorThrown);
+                        });
+
+
+                    }).fail(function(jqXHR, textStatus, errorThrown ){
+                        logger('error', 'jQuery Ajax Error', textStatus + ': ' + errorThrown);
+                    });
+                });
+                            
+
+                // Handle SDK events
+                for (var i=0; i < events.length; i++){
+                    var eventName = events[i];
+                    (function(eventName){
+                        phone.on(eventName, function(data){
+                            logger('log', eventName, data);
+                        });
+                    })(eventName);
+                }
+
+                // Additional handling for incoming call
+                phone.on('call:incoming', function(data){
+                    $('#from').val(phone.getCallerInfo(data.from).callerId);
+                    logger('log', 'Caller ID Details', phone.getCallerInfo(data.from));
+                });
+
+                // Handle warnings and errors
+                phone.on('warning', function(data){
+                    logger('warn', 'warning', data);
+                });
+
+                phone.on('error', function(data){
+                    logger('error', 'error', data);
+                });
+
+
+                // Clean up session gracefully on exit
+                phone.on('session:ready', function(data){
+                    sessionId = data.sessionId;
+                });
+
+                phone.on('session:disconnected', function(data){
+                    sessionId = null;
+                });
+
+                window.onunload = function(){
+                    if (sessionId){
+                        $.ajax('https://' + environs[environ]     + '/RTC/v1/sessions/' + sessionId, {
+                            type: 'DELETE',
+                            headers: {
+                                'Authorization': 'Bearer ' + $('#token').val()
+                            },
+                            async: false
+                        }).done(function(){
+                            console.log('DONE!');
+                        });
+                    }
+                };
+
+
+            } else {
+                logger('error', '[sad trombone]', 'WebRTC is not available in this browser. :o(');
+            }
+        });
+    </script>
+
+</body>
+</html>
+
