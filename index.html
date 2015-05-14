@@ -374,24 +374,23 @@
                         $('#token').val(data.access_token);
                         logger('log', 'VTN/No-TN Access Token Ready', data);
 
-                        // Associate token to UserID/VTN
-                        $.ajax('https://' + environs[environ]     + '/RTC/v1/userIds/' + $('#userId').val(), {
-                            type: 'PUT',
-                            headers: {
-                                'Authorization': 'Bearer ' + $('#token').val()
-                            }
-                        }).done(function(data){
-                            if ($('#userId').val().toLowerCase().indexOf('vtn:') === 0){
-                                $('#e911').prop('checked', true);
-                            } else {
-                                $('#e911').prop('checked', false);
-                            }
-                            logger('log', 'User ID ' + $('#userId').val() + ' associated to token', data);
-                            
-                        }).fail(function(jqXHR, textStatus, errorThrown ){
-                            logger('error', 'jQuery Ajax Error', textStatus + ': ' + errorThrown);
-                        });
 
+                        // Associate token to UserID/VTN
+                        phone.associateAccessToken({
+                           userId: $('#userId').val(),
+                           token: $('#token').val(),
+                           success: function(data){
+                                if ($('#userId').val().toLowerCase().indexOf('vtn:') === 0){
+                                    $('#e911').prop('checked', true);
+                                } else {
+                                    $('#e911').prop('checked', false);
+                                }
+                                logger('log', 'User ID ' + $('#userId').val() + ' associated to token', data);                                
+                            },
+                           error: function(data){
+                                logger('error', 'Associate Access Token Error', data)
+                            }
+                        });
 
                     }).fail(function(jqXHR, textStatus, errorThrown ){
                         logger('error', 'jQuery Ajax Error', textStatus + ': ' + errorThrown);
