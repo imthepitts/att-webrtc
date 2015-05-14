@@ -97,7 +97,7 @@
         <div style="width:50%;float:left;">
             <h3>Manage</h3>
             <button type="button" id="move">Move</button>
-            <button type="button" class="hangup">Hang Up</button>
+            <button type="button" id="hangup">Hang Up</button>
 
             <h3>Media</h3>
             <button type="button" id="mute">Mute</button><button type="button" id="unmute">Unmute</button> &nbsp;&nbsp;&nbsp;
@@ -333,7 +333,7 @@
                     phone.resume();
                 });
 
-                $('.hangup').on('click', function(){
+                $('#hangup').on('click', function(){
                     phone.hangup();
                 });
 
